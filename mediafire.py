@@ -13,7 +13,9 @@ from gazpacho import Soup
 from argparse import ArgumentParser
 from os import path, makedirs, remove, chdir, getcwd
 from threading import BoundedSemaphore, Thread, Event
-
+import undetected_chromedriver as uc
+from selenium_stealth import stealth
+from selenium.webdriver.common.by import By
 
 class bcolors:
     HEADER = "\033[95m"
@@ -37,6 +39,7 @@ HEADERS = {
     "Accept-Encoding": "gzip",
 }
 
+user_agent= "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
 
 def hash_file(filename: str) -> str:
     """
@@ -439,37 +442,34 @@ def download_file(
                 limiter.release()
             return
 
-    parsed_url = urllib.parse.urlparse(download_link)
-
-    conn = http.client.HTTPConnection(parsed_url.netloc)
-    conn.request(
-        "GET",
-        parsed_url.path,
-        headers=HEADERS,
-    )
-
-    response = conn.getresponse()
+    chrome_options = uc.ChromeOptions()
+    chrome_options.add_argument("user-agent={}".format(user_agent))
+    driver = uc.Chrome(headless=True, driver_executable_path='/home/ubuntu/chromedriver', options=chrome_options)
+    stealth(driver, languages=["en-US", "en"], vendor="Google Inc.", platform="Win32", webgl_vendor="Intel Inc.", renderer="Intel Iris OpenGL Engine", fix_hairline=True)
+    driver.get(download_link)
 
     # Check if the link is not a direct download link and extract the actual download link
-    if response.getheader("Content-Encoding") == "gzip":
-        compressed_data = response.read()
-        conn.close()
-        with GzipFile(fileobj=BytesIO(compressed_data)) as f:
-            html = f.read().decode("utf-8")
+    if driver.title == path.splitext(filename)[0]:
+        driver.implicitly_wait(10)
+        link_element = driver.find_element(By.ID, "downloadButton")
+        base64_data = link_element.get_attribute("data-scrambled-url")
+        decode_base_64_link = base64.b64decode(base64_data).decode("utf-8")
+        driver.quit()
+        parsed_url = urllib.parse.urlparse(decode_base_64_link)
+        conn = http.client.HTTPConnection(parsed_url.netloc)
+        conn.request(
+            "GET",
+            parsed_url.path,
+            headers=HEADERS,
+        )
 
-            # Parse HTML content to extract the actual download link
-            soup = Soup(html)
-            base64_data = soup.find("a", {"id": "downloadButton"}).attrs["data-scrambled-url"]
-            decode_base_64_link = base64.b64decode(base64_data).decode("utf-8")
-            parsed_url = urllib.parse.urlparse(decode_base_64_link)
-            conn = http.client.HTTPConnection(parsed_url.netloc)
-            conn.request(
-                "GET",
-                parsed_url.path,
-                headers=HEADERS,
-            )
-
-            response = conn.getresponse()
+        response = conn.getresponse()
+    else:
+            driver.quit()
+            print_error(download_link)
+            if limiter:
+                limiter.release()
+            return
 
     if 400 <= response.status < 600:
         conn.close()
