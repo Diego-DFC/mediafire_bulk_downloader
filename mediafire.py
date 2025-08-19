@@ -444,7 +444,7 @@ def download_file(
 
     chrome_options = uc.ChromeOptions()
     chrome_options.add_argument("user-agent={}".format(user_agent))
-    driver = uc.Chrome(headless=True, driver_executable_path='/home/ubuntu/chromedriver', options=chrome_options)
+    driver = uc.Chrome(headless=True, options=chrome_options)
     stealth(driver, languages=["en-US", "en"], vendor="Google Inc.", platform="Win32", webgl_vendor="Intel Inc.", renderer="Intel Iris OpenGL Engine", fix_hairline=True)
     driver.get(download_link)
 
