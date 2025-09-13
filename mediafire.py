@@ -453,8 +453,13 @@ def download_file(
         driver.implicitly_wait(10)
         link_element = driver.find_element(By.ID, "downloadButton")
         base64_data = link_element.get_attribute("data-scrambled-url")
-        decode_base_64_link = base64.b64decode(base64_data).decode("utf-8")
         driver.quit()
+        if base64_data == None:
+            print_error(download_link)
+            if limiter:
+                limiter.release()
+            return
+        decode_base_64_link = base64.b64decode(base64_data).decode("utf-8")
         parsed_url = urllib.parse.urlparse(decode_base_64_link)
         conn = http.client.HTTPConnection(parsed_url.netloc)
         conn.request(
