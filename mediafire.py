@@ -113,15 +113,10 @@ def print_error(link: str):
 
     Returns:
         None
-
-    Example:
-        >>> print_error("https://example.com/dangerous_file.txt")
-        Deleted file or Dangerous File Blocked
-        Take a look if you want to be sure: https://example.com/dangerous_file.txt
     """
     print(
-        f"{bcolors.FAIL}Deleted file or Dangerous File Blocked\n"
-        f"{bcolors.WARNING}Take a look if you want to be sure: {link}{bcolors.ENDC}"
+        f"{bcolors.FAIL}Download failed\n"
+        f"{bcolors.WARNING}Failed link: {link}{bcolors.ENDC}"
     )
 
 
@@ -452,15 +447,20 @@ def download_file(
     if driver.title == path.splitext(filename)[0]:
         driver.implicitly_wait(10)
         link_element = driver.find_element(By.ID, "downloadButton")
+        href = link_element.get_attribute("href")
         base64_data = link_element.get_attribute("data-scrambled-url")
-        driver.quit()
+        
         if base64_data == None:
-            print_error(download_link)
-            if limiter:
-                limiter.release()
-            return
-        decode_base_64_link = base64.b64decode(base64_data).decode("utf-8")
-        parsed_url = urllib.parse.urlparse(decode_base_64_link)
+            if driver.title in href:
+                real_link = href
+            else:
+                print_error(download_link)
+                if limiter:
+                    limiter.release()
+                return
+        else:
+            real_link = base64.b64decode(base64_data).decode("utf-8")
+        parsed_url = urllib.parse.urlparse(real_link)
         conn = http.client.HTTPConnection(parsed_url.netloc)
         conn.request(
             "GET",
@@ -503,6 +503,7 @@ def download_file(
             f.write(chunk)
 
     conn.close()
+    driver.quit()
 
     # Print download success message
     print(f"{bcolors.OKGREEN}{filename}{bcolors.ENDC} downloaded")
