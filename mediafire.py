@@ -455,6 +455,7 @@ def download_file(
                 real_link = href
             else:
                 print_error(download_link)
+                driver.quit()
                 if limiter:
                     limiter.release()
                 return
